@@ -37,6 +37,36 @@ func (f Fields) Sizeof(val reflect.Value) int {
 	return size
 }
 
+func (f Fields) Len(val reflect.Value) int {
+	k := val.Kind()
+	for val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	switch k {
+		case reflect.Array:
+			fallthrough
+		case reflect.Chan:
+			fallthrough
+		case reflect.Map:
+			fallthrough
+		case reflect.Slice:
+			fallthrough
+		case reflect.String:
+			return val.Len()
+		case reflect.Struct:
+			size := 0
+			for i := 0; i < val.NumField(); i++  {
+				v := val.Field(i)
+				flen := f.Len(v)
+				size += flen
+			}
+			return size
+		default:
+			return int(val.Type().Size())
+	}
+	panic("Shouldn't reach here")
+}
+
 func (f Fields) Pack(buf []byte, val reflect.Value) error {
 	for val.Kind() == reflect.Ptr {
 		val = val.Elem()
@@ -55,7 +85,7 @@ func (f Fields) Pack(buf []byte, val reflect.Value) error {
 			length = field.Size(v)
 		}
 		if field.Sizeof != nil {
-			length := val.FieldByIndex(field.Sizeof).Len()
+			length = f.Len(val.FieldByIndex(field.Sizeof))
 			v = reflect.ValueOf(length)
 		}
 		err := field.Pack(buf[pos:], v, length)
